@@ -1286,7 +1286,7 @@ PianoReturn_t PianoResponse (PianoHandle_t *ph, PianoRequest_t *req) {
             song->trackToken = strdup(trackToken);
             song->length = getInt(Val, "duration");
          // Save release date for sorting
-            song->fileGain = ((Year - 1900) * 10000) + (Month * 100) + Day;
+            song->releaseDate = ((Year - 1900) * 10000) + (Month * 100) + Day;
          // Add to playlist in release data order
             PianoSong_t *thisSong = playlist;
             PianoSong_t *lastSong = (PianoSong_t *) &playlist;
@@ -1296,8 +1296,7 @@ PianoReturn_t PianoResponse (PianoHandle_t *ph, PianoRequest_t *req) {
                   // LOG("Added to end of list\n");
                   break;
                }
-               // LOG("Comparing to %s\n",thisSong->title);
-               if(thisSong->fileGain > song->fileGain) {
+               if(thisSong->releaseDate > song->releaseDate) {
                   lastSong->head.next = (struct PianoListHead *) song;
                   song->head.next = (struct PianoListHead *) thisSong;
                   // LOG("Added before\n");
