@@ -52,8 +52,6 @@ LIBPIANO_OBJ:=${LIBPIANO_SRC:.c=.o}
 LIBPIANO_RELOBJ:=${LIBPIANO_SRC:.c=.lo}
 LIBPIANO_INCLUDE:=${LIBPIANO_DIR}
 
-LIBAV = /home/skip/open_src/audio/ffmpeg
-
 ifneq (${LIBAV},)
 PKG_CONFIG_LIBDIR=PKG_CONFIG_LIBDIR=${LIBAV}/lib/pkgconfig
 endif
