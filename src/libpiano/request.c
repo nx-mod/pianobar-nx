@@ -515,7 +515,6 @@ PianoReturn_t PianoRequest (PianoHandle_t *ph, PianoRequest_t *req,
 			json_object_object_add(a,"limit",json_object_new_int(100));
 			json_object_object_add(a,"annotationLimit",json_object_new_int(100));
 			json_object_object_add(j,"request",a);
-			json_object_object_add(j,"deviceId",json_object_new_string("1880"));
 			method = "collections.v7.getSortedPlaylists";
 			break;
 		}
@@ -537,7 +536,6 @@ PianoReturn_t PianoRequest (PianoHandle_t *ph, PianoRequest_t *req,
 					json_object_object_add(a,"annotationLimit",json_object_new_int(100));
 					json_object_object_add(a,"bypassPrivacyRu1les",json_object_new_boolean(true));
 					json_object_object_add(j,"request",a);
-					json_object_object_add(j,"deviceId",json_object_new_string("1880"));
 					method = "playlists.v7.getTracks";
 					break;
 				}
@@ -600,7 +598,6 @@ PianoReturn_t PianoRequest (PianoHandle_t *ph, PianoRequest_t *req,
 			json_object_object_add(a,"limit",json_object_new_int(4));
 			json_object_object_add(a,"cursor",json_object_new_string("g6FjzwAFdTr1OqMYoXbAoXSWokFSolRSolBMolBDokFMolBF"));
 	#endif
-			json_object_object_add(j,"deviceId",json_object_new_string("1880"));
 			method = "collections.v7.getItems";
 			break;
 		}
