@@ -21,7 +21,7 @@ Features
 - proxy support for listeners outside the USA
 
 .. _last.fm: https://www.last.fm
-.. _configuration example: https://github.com/PromyLOPh/pianobar/blob/master/contrib/config-example
+.. _configuration example: https://codeberg.org/purplesym/pianobar/src/branch/master/contrib/config-example
 
 Download
 --------
@@ -33,8 +33,8 @@ and \*BSD as well as a `native Windows port`_.
 .. _homebrew: http://brew.sh/
 .. _native Windows Port: https://github.com/thedmd/pianobar-windows
 
-The current pianobar release is 2024.12.21_ (sha256__, sign__). More recent and
-experimental code is available at GitHub_ and the local gitweb_. Older releases
+The current pianobar release is 2024.12.21_ (sha256__, sign__). More
+recent and experimental code is available at Codeberg_. Older releases
 are available here:
 
 - 2022.04.01_ (sha256__, sign__)
@@ -68,6 +68,7 @@ are available here:
 - 2010.10.07_ (sha1__)
 - 2010.08.21_ (sha1__)
 
+.. _Codeberg: https://codeberg.org/purplesym/pianobar
 .. _2024.12.21: https://6xq.net/pianobar/pianobar-2024.12.21.tar.bz2
 __ https://6xq.net/pianobar/pianobar-2024.12.21.tar.bz2.sha256
 __ https://6xq.net/pianobar/pianobar-2024.12.21.tar.bz2.asc
@@ -77,9 +78,6 @@ __ https://6xq.net/pianobar/pianobar-2022.04.01.tar.bz2.asc
 .. _2020.11.28: https://6xq.net/pianobar/pianobar-2020.11.28.tar.bz2
 __ https://6xq.net/pianobar/pianobar-2020.11.28.tar.bz2.sha256
 __ https://6xq.net/pianobar/pianobar-2020.11.28.tar.bz2.asc
-.. _snapshot: http://github.com/PromyLOPh/pianobar/tarball/master
-.. _GitHub: http://github.com/PromyLOPh/pianobar/
-.. _gitweb: https://6xq.net/git/lars/pianobar.git/
 .. _2020.04.05: https://6xq.net/pianobar/pianobar-2020.04.05.tar.bz2
 __ https://6xq.net/pianobar/pianobar-2020.04.05.tar.bz2.sha256
 __ https://6xq.net/pianobar/pianobar-2020.04.05.tar.bz2.asc
