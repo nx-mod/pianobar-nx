@@ -1,153 +1,135 @@
-# makefile of pianobar
+#---------------------------------------------------------------------------------
+.SUFFIXES:
+#---------------------------------------------------------------------------------
 
-PKG_CONFIG?=pkg-config
-PREFIX:=/usr/local
-BINDIR:=${PREFIX}/bin
-LIBDIR:=${PREFIX}/lib
-INCDIR:=${PREFIX}/include
-MANDIR:=${PREFIX}/share/man
-DYNLINK:=0
-CFLAGS?=-O2 -DNDEBUG
-
-ifeq (${CC},cc)
-	OS := $(shell uname)
-	ifeq (${OS},Darwin)
-		CC:=gcc -std=c99
-	else ifeq (${OS},FreeBSD)
-		CC:=cc -std=c99
-	else ifeq (${OS},OpenBSD)
-		CC:=cc -std=c99
-	else
-		CC:=c99
-	endif
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/devkitpro")
 endif
 
-PIANOBAR_DIR:=src
-PIANOBAR_SRC:=\
-		${PIANOBAR_DIR}/main.c \
-		${PIANOBAR_DIR}/debug.c \
-		${PIANOBAR_DIR}/player.c \
-		${PIANOBAR_DIR}/settings.c \
-		${PIANOBAR_DIR}/terminal.c \
-		${PIANOBAR_DIR}/ui_act.c \
-		${PIANOBAR_DIR}/ui.c \
-		${PIANOBAR_DIR}/ui_readline.c \
-		${PIANOBAR_DIR}/ui_dispatch.c
-PIANOBAR_OBJ:=${PIANOBAR_SRC:.c=.o}
+include $(DEVKITPRO)/libnx/switch_rules
 
-LIBPIANO_DIR:=src/libpiano
-LIBPIANO_SRC:=\
-		${LIBPIANO_DIR}/crypt.c \
-		${LIBPIANO_DIR}/piano.c \
-		${LIBPIANO_DIR}/request.c \
-		${LIBPIANO_DIR}/response.c \
-		${LIBPIANO_DIR}/list.c
-LIBPIANO_OBJ:=${LIBPIANO_SRC:.c=.o}
-LIBPIANO_RELOBJ:=${LIBPIANO_SRC:.c=.lo}
-LIBPIANO_INCLUDE:=${LIBPIANO_DIR}
+#---------------------------------------------------------------------------------
+# TARGET is the name of the output
+# BUILD is the directory where object files & intermediate files will be placed
+# SOURCES is a list of directories containing source code
+# DATA is a list of directories containing data files
+# INCLUDES is a list of directories containing header files
+#---------------------------------------------------------------------------------
+TARGET		:=	pianobar
+BUILD		:=	build
+SOURCES		:=	src src/ao src/nx
+INCLUDES	:=	src
 
-LIBAV_CFLAGS:=$(shell $(PKG_CONFIG) --cflags libavcodec libavformat libavutil libavfilter)
-LIBAV_LDFLAGS:=$(shell $(PKG_CONFIG) --libs libavcodec libavformat libavutil libavfilter)
+APP_TITLE		:=	pianobar
+APP_AUTHOR		:=	nx-mod
+APP_VERSION		:=	nx-1
 
-LIBCURL_CFLAGS:=$(shell $(PKG_CONFIG) --cflags libcurl)
-LIBCURL_LDFLAGS:=$(shell $(PKG_CONFIG) --libs libcurl)
+#---------------------------------------------------------------------------------
+# options for code generation
+#---------------------------------------------------------------------------------
+ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE
 
-LIBGCRYPT_CFLAGS:=$(shell $(PKG_CONFIG) --cflags libgcrypt)
-LIBGCRYPT_LDFLAGS:=$(shell $(PKG_CONFIG) --libs libgcrypt)
+CFLAGS	:=	-g -Wall -O2 -std=gnu11 -ffunction-sections -fdata-sections $(ARCH) \
+			-D__SWITCH__ \
+			-I$(PORTLIBS)/include/json-c
 
-LIBJSONC_CFLAGS:=$(shell $(PKG_CONFIG) --cflags json-c 2>/dev/null || $(PKG_CONFIG) --cflags json)
-LIBJSONC_LDFLAGS:=$(shell $(PKG_CONFIG) --libs json-c 2>/dev/null || $(PKG_CONFIG) --libs json)
+CFLAGS	+=	$(INCLUDE)
 
-LIBAO_CFLAGS:=$(shell $(PKG_CONFIG) --cflags ao)
-LIBAO_LDFLAGS:=$(shell $(PKG_CONFIG) --libs ao)
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++17
 
-# combine all flags
-ALL_CFLAGS:=${CFLAGS} -I ${LIBPIANO_INCLUDE} \
-			${LIBAV_CFLAGS} ${LIBCURL_CFLAGS} \
-			${LIBGCRYPT_CFLAGS} ${LIBJSONC_CFLAGS} \
-			${LIBAO_CFLAGS}
-ALL_LDFLAGS:=${LDFLAGS} -lpthread -lm \
-			${LIBAV_LDFLAGS} ${LIBCURL_LDFLAGS} \
-			${LIBGCRYPT_LDFLAGS} ${LIBJSONC_LDFLAGS} \
-			${LIBAO_LDFLAGS}
+ASFLAGS	:=	-g $(ARCH)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,-Map,$(notdir $*.map) -Wl,--gc-sections
 
-# Be verbose if V=1 (gnu autotools’ --disable-silent-rules)
-SILENTCMD:=@
-SILENTECHO:=@echo
-ifeq (${V},1)
-	SILENTCMD:=
-	SILENTECHO:=@true
-endif
+LIBS	:=	-lpiano \
+			-Wl,--start-group \
+			-lavfilter -lavformat -lavcodec -lswscale -lswresample -lavutil \
+			-lass -lfribidi -ldav1d -lbz2 -lfreetype -lharfbuzz -lpng16 -lpostproc \
+			-Wl,--end-group \
+			-lmbedtls -lmbedx509 -lmbedcrypto \
+			-lcurl -ljson-c -lz \
+			-lnx -lm -lpthread
 
-# build pianobar
-ifeq (${DYNLINK},1)
-pianobar: ${PIANOBAR_OBJ} libpiano.so.0
-	${SILENTECHO} "  LINK  $@"
-	${SILENTCMD}${CC} -o $@ ${PIANOBAR_OBJ} -L. -lpiano ${ALL_LDFLAGS}
+#---------------------------------------------------------------------------------
+# list of directories containing libraries, this must be the top level containing
+# include and lib
+#---------------------------------------------------------------------------------
+LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/../libpiano-nx
+
+#---------------------------------------------------------------------------------
+# no real need to edit anything past this point unless you need to add additional
+# rules for different file extensions
+#---------------------------------------------------------------------------------
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+#---------------------------------------------------------------------------------
+
+export OUTPUT	:=	$(CURDIR)/$(TARGET)
+export TOPDIR	:=	$(CURDIR)
+
+export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
+			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
+
+export DEPSDIR	:=	$(CURDIR)/$(BUILD)
+
+CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
+CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
+SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
+BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
+
+#---------------------------------------------------------------------------------
+ifeq ($(strip $(CPPFILES)),)
+	export LD	:=	$(CC)
 else
-pianobar: ${PIANOBAR_OBJ} ${LIBPIANO_OBJ}
-	${SILENTECHO} "  LINK  $@"
-	${SILENTCMD}${CC} -o $@ ${PIANOBAR_OBJ} ${LIBPIANO_OBJ} ${ALL_LDFLAGS}
+	export LD	:=	$(CXX)
 endif
 
-# build shared and static libpiano
-libpiano.so.0: ${LIBPIANO_RELOBJ} ${LIBPIANO_OBJ}
-	${SILENTECHO} "  LINK  $@"
-	${SILENTCMD}${CC} -shared -Wl,-soname,libpiano.so.0 -o libpiano.so.0.0.0 \
-			${LIBPIANO_RELOBJ} ${ALL_LDFLAGS}
-	${SILENTCMD}ln -fs libpiano.so.0.0.0 libpiano.so.0
-	${SILENTCMD}ln -fs libpiano.so.0 libpiano.so
-	${SILENTECHO} "    AR  libpiano.a"
-	${SILENTCMD}${AR} rcs libpiano.a ${LIBPIANO_OBJ}
+export OFILES_BIN	:=	$(addsuffix .o,$(BINFILES))
+export OFILES_SRC	:=	$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+export OFILES 		:=	$(OFILES_BIN) $(OFILES_SRC)
+export HFILES		:=	$(addsuffix .h,$(subst .,_,$(BINFILES)))
 
+export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+			-I$(CURDIR)/$(BUILD)
 
--include $(PIANOBAR_SRC:.c=.d)
--include $(LIBPIANO_SRC:.c=.d)
+export NROFLAGS	:=	--nacp=$(TOPDIR)/$(TARGET).nacp
 
-# build standard object files
-%.o: %.c
-	${SILENTECHO} "    CC  $<"
-	${SILENTCMD}${CC} -c -o $@ ${ALL_CFLAGS} -MMD -MF $*.d -MP $<
+export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-# create position independent code (for shared libraries)
-%.lo: %.c
-	${SILENTECHO} "    CC  $< (PIC)"
-	${SILENTCMD}${CC} -c -fPIC -o $@ ${ALL_CFLAGS} -MMD -MF $*.d -MP $<
+.PHONY: $(BUILD) clean all
 
+#---------------------------------------------------------------------------------
+all: $(BUILD)
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+
+#---------------------------------------------------------------------------------
 clean:
-	${SILENTECHO} " CLEAN"
-	${SILENTCMD}${RM} ${PIANOBAR_OBJ} ${LIBPIANO_OBJ} \
-			${LIBPIANO_RELOBJ} pianobar libpiano.so* \
-			libpiano.a $(PIANOBAR_SRC:.c=.d) $(LIBPIANO_SRC:.c=.d)
+	@echo Cleaning build files...
+	@rm -fr $(BUILD) $(TARGET).nro $(TARGET).nacp $(TARGET).elf
+	@echo Done!
 
-all: pianobar
-
-ifeq (${DYNLINK},1)
-install: pianobar install-libpiano
+#---------------------------------------------------------------------------------
 else
-install: pianobar
+.PHONY:	all
+
+DEPENDS	:=	$(OFILES:.o=.d)
+
+#---------------------------------------------------------------------------------
+all	:	$(OUTPUT).nro
+
+$(OUTPUT).nro	:	$(OUTPUT).elf	$(TOPDIR)/$(TARGET).nacp
+
+$(OUTPUT).elf	:	$(OFILES)
+
+$(OFILES_SRC)	: $(HFILES)
+
+%.nacp:
+	nacptool --create "$(APP_TITLE)" "$(APP_AUTHOR)" "$(APP_VERSION)" $@
+
+-include $(DEPENDS)
+
+#---------------------------------------------------------------------------------------
 endif
-	install -d ${DESTDIR}${BINDIR}/
-	install -m755 pianobar ${DESTDIR}${BINDIR}/
-	install -d ${DESTDIR}${MANDIR}/man1/
-	install -m644 contrib/pianobar.1 ${DESTDIR}${MANDIR}/man1/
-
-install-libpiano:
-	install -d ${DESTDIR}${LIBDIR}/
-	install -m644 libpiano.so.0.0.0 ${DESTDIR}${LIBDIR}/
-	ln -fs libpiano.so.0.0.0 ${DESTDIR}${LIBDIR}/libpiano.so.0
-	ln -fs libpiano.so.0 ${DESTDIR}${LIBDIR}/libpiano.so
-	install -m644 libpiano.a ${DESTDIR}${LIBDIR}/
-	install -d ${DESTDIR}${INCDIR}/
-	install -m644 src/libpiano/piano.h ${DESTDIR}${INCDIR}/
-
-uninstall:
-	$(RM) ${DESTDIR}/${BINDIR}/pianobar \
-	${DESTDIR}/${MANDIR}/man1/pianobar.1 \
-	${DESTDIR}/${LIBDIR}/libpiano.so.0.0.0 \
-	${DESTDIR}/${LIBDIR}/libpiano.so.0 \
-	${DESTDIR}/${LIBDIR}/libpiano.so \
-	${DESTDIR}/${LIBDIR}/libpiano.a \
-	${DESTDIR}/${INCDIR}/piano.h
-
-.PHONY: install install-libpiano uninstall test debug all
+#---------------------------------------------------------------------------------------

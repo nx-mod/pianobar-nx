@@ -30,6 +30,10 @@ THE SOFTWARE.
 #include "ui_readline.h"
 #include "main.h"
 
+#ifdef __SWITCH__
+#include "nx/nx_ui.h"
+#endif
+
 /*	return size of previous UTF-8 character
  */
 static size_t BarReadlinePrevUtf8 (char *ptr) {
@@ -52,6 +56,50 @@ static size_t BarReadlinePrevUtf8 (char *ptr) {
  *	@param timeout (seconds) or -1 (no timeout)
  *	@return number of bytes read from stdin
  */
+#ifdef __SWITCH__
+/* Switch has no tty behind stdin, so this replaces the whole
+ * select()/read() model rather than special-casing pieces of it -- see
+ * nx/nx_ui.h for why. `input`/`echo` are meaningless here (no raw fd,
+ * and swkbd/console handle their own echo). */
+size_t BarReadline (char *buf, const size_t bufSize, const char *mask,
+		BarReadlineFds_t *input, const BarReadlineFlags_t flags, int timeout) {
+	(void) input;
+
+	memset (buf, 0, bufSize);
+
+	if (timeout >= 0) {
+		/* realtime single-key dispatch while a song is playing */
+		char c = BarNxPollCommandKey (timeout);
+		if (c == 0) {
+			return 0;
+		}
+		buf[0] = c;
+		buf[1] = '\0';
+		return 1;
+	}
+
+	/* full text entry (login, search, station number, y/n confirm) */
+	size_t len = BarNxReadLine (buf, bufSize,
+			(flags & BAR_RL_NOECHO) != 0, NULL);
+
+	if (mask != NULL) {
+		/* keep only characters allowed by mask, e.g. "yYnN" or digits */
+		size_t kept = 0;
+		for (size_t i = 0; i < len; i++) {
+			if (strchr (mask, buf[i]) != NULL) {
+				buf[kept++] = buf[i];
+				if (flags & BAR_RL_FULLRETURN) {
+					break;
+				}
+			}
+		}
+		buf[kept] = '\0';
+		len = kept;
+	}
+
+	return len;
+}
+#else
 size_t BarReadline (char *buf, const size_t bufSize, const char *mask,
 		BarReadlineFds_t *input, const BarReadlineFlags_t flags, int timeout) {
 	size_t bufLen = 0;
@@ -202,6 +250,7 @@ size_t BarReadline (char *buf, const size_t bufSize, const char *mask,
 	buf[bufLen] = '\0';
 	return bufLen;
 }
+#endif /* __SWITCH__ */
 
 /*	Read string from stdin
  *	@param buffer

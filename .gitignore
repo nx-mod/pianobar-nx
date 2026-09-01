@@ -7,3 +7,9 @@ pianobar
 libpiano.a
 libpiano.so*
 waitress-test
+
+# Switch build output
+build/
+*.elf
+*.nro
+*.nacp

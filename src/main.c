@@ -36,8 +36,6 @@ THE SOFTWARE.
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-/* tcset/getattr () */
-#include <termios.h>
 #include <pthread.h>
 #include <assert.h>
 #include <stdbool.h>
@@ -56,6 +54,11 @@ THE SOFTWARE.
 #include "ui.h"
 #include "ui_dispatch.h"
 #include "ui_readline.h"
+
+#ifdef __SWITCH__
+#include <switch.h>
+#include "nx/nx_ui.h"
+#endif
 
 /*	authenticate user
  */
@@ -101,6 +104,21 @@ static bool BarMainGetLoginCredentials (BarSettings_t *settings,
 			BarUiMsg (settings, MSG_QUESTION, "Email: %s\n", settings->username);
 		}
 
+#ifdef __SWITCH__
+		(void) passBuf;
+		if (settings->passwordCmd != NULL) {
+			BarUiMsg (settings, MSG_NONE,
+					"Error: passwordCmd is not supported on Switch (no fork/exec).\n");
+			return false;
+		}
+		BarUiMsg (settings, MSG_QUESTION, "Password: ");
+		if (BarReadlineStr (passBuf, sizeof (passBuf), input, BAR_RL_NOECHO) == 0) {
+			puts ("");
+			return false;
+		}
+		puts ("");
+		settings->password = strdup (passBuf);
+#else
 		if (settings->passwordCmd == NULL) {
 			BarUiMsg (settings, MSG_QUESTION, "Password: ");
 			if (BarReadlineStr (passBuf, sizeof (passBuf), input, BAR_RL_NOECHO) == 0) {
@@ -159,6 +177,7 @@ static bool BarMainGetLoginCredentials (BarSettings_t *settings,
 				}
 			}
 		} /* end else passwordCmd */
+#endif /* __SWITCH__ */
 	}
 
 	return true;
@@ -356,6 +375,11 @@ static void BarMainLoop (BarApp_t *app) {
 	if (!BarMainLoginUser (app)) {
 		return;
 	}
+#ifdef __SWITCH__
+	/* only reached after the server actually accepted these credentials --
+	 * save them so they don't have to be retyped via swkbd next launch */
+	BarSettingsSaveCredentials (&app->settings);
+#endif
 
 	if (!BarMainGetStations (app)) {
 		return;
@@ -419,37 +443,76 @@ static void intHandler (int signal) {
 }
 
 static void BarMainSetupSigaction () {
+#ifdef __SWITCH__
+	/* no SIGINT delivery on Switch -- quitting goes through the UI's own
+	 * key dispatch instead */
+#else
 	struct sigaction act = {
 			.sa_handler = intHandler,
 			.sa_flags = 0,
 			};
 	sigemptyset (&act.sa_mask);
 	sigaction (SIGINT, &act, NULL);
+#endif
 }
 
+#ifdef __SWITCH__
+/* best-effort, non-aborting startup trace -- never let a logging failure
+ * itself take the process down. Written to the SD card so a crash before
+ * any UI output is still diagnosable after the fact. */
+static void dbgTrace (const char *msg) {
+	FILE *f = fopen ("sdmc:/switch/pianobar-nx/debug.log", "a");
+	if (f == NULL) {
+		return;
+	}
+	fprintf (f, "%s\n", msg);
+	fclose (f);
+}
+#define DBG_TRACE(msg) dbgTrace (msg)
+#else
+#define DBG_TRACE(msg)
+#endif
+
 int main (int argc, char **argv) {
+	DBG_TRACE ("main: enter");
 	static BarApp_t app;
 
 	debugEnable();
 
 	memset (&app, 0, sizeof (app));
 
+#ifdef __SWITCH__
+	BarNxUiInit ();
+	DBG_TRACE ("main: BarNxUiInit done");
+
+	/* curl_global_init() alone does NOT bring up networking on Switch --
+	 * this is what actually initializes the bsd:u socket service
+	 * everything else (curl, mbedtls' transport) rides on top of. */
+	socketInitializeDefault ();
+	DBG_TRACE ("main: socketInitializeDefault done");
+#endif
+
 	/* save terminal attributes, before disabling echoing */
 	BarTermInit ();
+	DBG_TRACE ("main: BarTermInit done");
 
 	/* signals */
 	signal (SIGPIPE, SIG_IGN);
 	BarMainSetupSigaction ();
 	interrupted = &app.doQuit;
+	DBG_TRACE ("main: signals done");
 
 	/* init some things */
 	gcry_check_version (NULL);
 	gcry_control (GCRYCTL_DISABLE_SECMEM, 0);
 	gcry_control (GCRYCTL_INITIALIZATION_FINISHED, 0);
+	DBG_TRACE ("main: gcry stubs done");
 	BarPlayerInit (&app.player, &app.settings);
+	DBG_TRACE ("main: BarPlayerInit done (ao_initialize ran)");
 
 	BarSettingsInit (&app.settings);
 	BarSettingsRead (&app.settings);
+	DBG_TRACE ("main: BarSettingsRead done");
 
 	PianoReturn_t pret;
 	if ((pret = PianoInit (&app.ph, app.settings.partnerUser,
@@ -457,8 +520,13 @@ int main (int argc, char **argv) {
 			app.settings.inkey, app.settings.outkey)) != PIANO_RET_OK) {
 		BarUiMsg (&app.settings, MSG_ERR, "Initialization failed:"
 				" %s\n", PianoErrorToStr (pret));
+#ifdef __SWITCH__
+		BarNxWaitForExit ();
+		BarNxUiExit ();
+#endif
 		return 0;
 	}
+	DBG_TRACE ("main: PianoInit done");
 
 	BarUiMsg (&app.settings, MSG_NONE,
 			"Welcome to " PACKAGE " (" VERSION ")! ");
@@ -471,8 +539,10 @@ int main (int argc, char **argv) {
 	}
 
 	curl_global_init (CURL_GLOBAL_DEFAULT);
+	DBG_TRACE ("main: curl_global_init done");
 	app.http = curl_easy_init ();
 	assert (app.http != NULL);
+	DBG_TRACE ("main: curl_easy_init done");
 
 	/* init fds */
 	FD_ZERO(&app.input.set);
@@ -501,7 +571,13 @@ int main (int argc, char **argv) {
 			app.input.fds[1];
 	++app.input.maxfd;
 
+	DBG_TRACE ("main: entering BarMainLoop");
 	BarMainLoop (&app);
+	DBG_TRACE ("main: BarMainLoop returned");
+
+#ifdef __SWITCH__
+	BarNxWaitForExit ();
+#endif
 
 	if (app.input.fds[1] != -1) {
 		close (app.input.fds[1]);
@@ -520,6 +596,11 @@ int main (int argc, char **argv) {
 
 	/* restore terminal attributes, zsh doesn't need this, bash does... */
 	BarTermRestore ();
+
+#ifdef __SWITCH__
+	socketExit ();
+	BarNxUiExit ();
+#endif
 
 	return 0;
 }

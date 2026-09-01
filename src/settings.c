@@ -54,6 +54,11 @@ static char *BarSettingsGetHome () {
 		return strdup (home);
 	}
 
+#ifdef __SWITCH__
+	/* no user accounts/passwd db on Switch -- config/cache lives on the SD
+	 * card instead */
+	return strdup ("sdmc:/switch/pianobar-nx");
+#else
 	/* try passwd mechanism */
 	struct passwd * const pw = getpwuid (getuid ());
 	if (pw != NULL && pw->pw_dir != NULL && strlen (pw->pw_dir) > 0) {
@@ -61,6 +66,7 @@ static char *BarSettingsGetHome () {
 	}
 
 	return NULL;
+#endif
 }
 
 /*	Get XDG config directory, which is set by BarSettingsRead (if not set)
@@ -483,4 +489,82 @@ void BarSettingsWrite (PianoStation_t *station, BarSettings_t *settings) {
 	fclose (fd);
 	free (path);
 }
+
+#ifdef __SWITCH__
+/* true if the trimmed line starts with "user" or "password" followed by
+ * (optional spaces then) '=' -- same key names BarSettingsRead parses */
+static bool isCredentialLine (const char *line) {
+	while (isspace ((unsigned char) *line)) {
+		++line;
+	}
+	const char *keys[] = {"user", "password"};
+	for (size_t i = 0; i < sizeof (keys) / sizeof (*keys); i++) {
+		const size_t klen = strlen (keys[i]);
+		if (strncmp (line, keys[i], klen) == 0) {
+			const char *rest = line + klen;
+			while (isspace ((unsigned char) *rest)) {
+				++rest;
+			}
+			if (*rest == '=') {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void BarSettingsSaveCredentials (const BarSettings_t *settings) {
+	if (settings->username == NULL || settings->password == NULL) {
+		return;
+	}
+
+	char * const path = BarGetXdgConfigDir (PACKAGE "/config");
+	assert (path != NULL);
+
+	/* keep any existing non-credential lines (custom keybindings, format
+	 * strings, etc.) -- read the whole file into memory first since we're
+	 * about to reopen the same path for writing */
+	char *kept = NULL;
+	size_t keptLen = 0;
+	FILE *in = fopen (path, "r");
+	if (in != NULL) {
+		char line[1024];
+		while (fgets (line, sizeof (line), in) != NULL) {
+			if (isCredentialLine (line)) {
+				continue;
+			}
+			const size_t lineLen = strlen (line);
+			char * const grown = realloc (kept, keptLen + lineLen + 1);
+			if (grown == NULL) {
+				break;
+			}
+			kept = grown;
+			memcpy (kept + keptLen, line, lineLen + 1);
+			keptLen += lineLen;
+		}
+		fclose (in);
+	}
+
+	FILE *out = fopen (path, "w");
+	if (out == NULL) {
+		free (kept);
+		free (path);
+		return;
+	}
+
+	if (kept != NULL) {
+		fwrite (kept, 1, keptLen, out);
+	}
+	fprintf (out, "user = %s\n", settings->username);
+	fprintf (out, "password = %s\n", settings->password);
+
+	fclose (out);
+	free (kept);
+	free (path);
+}
+#else
+void BarSettingsSaveCredentials (const BarSettings_t *settings) {
+	(void) settings;
+}
+#endif
 

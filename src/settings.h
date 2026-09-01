@@ -115,4 +115,8 @@ void BarSettingsInit (BarSettings_t *);
 void BarSettingsDestroy (BarSettings_t *);
 void BarSettingsRead (BarSettings_t *);
 void BarSettingsWrite (PianoStation_t *, BarSettings_t *);
+/* Switch-only: persists username/password into the config file so they
+ * don't have to be retyped via swkbd on every launch. No-op elsewhere --
+ * upstream pianobar deliberately never auto-writes plaintext credentials. */
+void BarSettingsSaveCredentials (const BarSettings_t *);
 

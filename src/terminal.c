@@ -21,13 +21,25 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-#include <termios.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
-#include <signal.h>
 
 #include "terminal.h"
+
+#ifdef __SWITCH__
+
+/* No real tty on Switch (devkitA64's termios.h isn't even usable -- it
+ * pulls in sys/termios.h, which doesn't exist), and no shell job control
+ * to send SIGCONT either. Input comes from HidNpad/swkbd instead, wired
+ * up wherever stdin was read directly -- see ui_readline.c. */
+void BarTermInit () {}
+void BarTermRestore () {}
+
+#else
+
+#include <termios.h>
+#include <signal.h>
 
 /* need a global variable here, since these functions get called from a signal
  * handler */
@@ -55,4 +67,6 @@ void BarTermInit () {
 void BarTermRestore () {
 	tcsetattr (STDIN_FILENO, TCSANOW, &restore);
 }
+
+#endif
 

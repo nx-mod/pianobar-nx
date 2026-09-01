@@ -43,6 +43,10 @@ THE SOFTWARE.
 #include "debug.h"
 #include "ui_readline.h"
 
+#ifdef __SWITCH__
+#include "nx/nx_ui.h"
+#endif
+
 typedef int (*BarSortFunc_t) (const void *, const void *);
 
 /*	is string a number?
@@ -126,6 +130,9 @@ void BarUiMsg (const BarSettings_t *settings, const BarUiMsg_t type,
 	}
 
 	fflush (stdout);
+#ifdef __SWITCH__
+	BarNxUiUpdate ();
+#endif
 }
 
 typedef struct {
@@ -906,6 +913,12 @@ void BarUiStartEventCmd (const BarSettings_t *settings, const char *type,
 		return;
 	}
 
+#ifdef __SWITCH__
+	/* no fork/exec on Switch -- eventcmd hook scripts can't run here */
+	(void) pipeFd;
+	BarUiMsg (settings, MSG_ERR, "eventcmd is not supported on Switch.\n");
+	return;
+#else
 	if (pipe (pipeFd) == -1) {
 		BarUiMsg (settings, MSG_ERR, "Cannot create eventcmd pipe. (%s)\n", strerror (errno));
 		return;
@@ -1000,6 +1013,7 @@ void BarUiStartEventCmd (const BarSettings_t *settings, const char *type,
 		/* wait to get rid of the zombie */
 		waitpid (chld, &status, 0);
 	}
+#endif /* __SWITCH__ */
 }
 
 /*	prepend song to history

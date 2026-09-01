@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include <signal.h>
 
 #include <ao/ao.h>
+#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavfilter/avfilter.h>
 #include <libavcodec/avcodec.h>
