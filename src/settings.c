@@ -152,14 +152,24 @@ void BarSettingsDestroy (BarSettings_t *settings) {
  *	@return nothing yet
  */
 void BarSettingsRead (BarSettings_t *settings) {
+#ifdef __SWITCH__
+	char * const configfiles[] = {PACKAGE "/state", PACKAGE "/account.cfg"};
+#else
 	char * const configfiles[] = {PACKAGE "/state", PACKAGE "/config"};
+#endif
 	char * const userhome = BarSettingsGetHome ();
 	assert (userhome != NULL);
 	/* set xdg config path (if not set) */
+#ifdef __SWITCH__
+	/* matches this repo's other homebrew: settings live directly under
+	 * sdmc:/config/<app>/, not nested under /switch/<app>/.config/<app>/ */
+	setenv ("XDG_CONFIG_HOME", "sdmc:/config", 0);
+#else
 	char * const defaultxdg = malloc (strlen (userhome) + strlen ("/.config") + 1);
 	sprintf (defaultxdg, "%s/.config", userhome);
 	setenv ("XDG_CONFIG_HOME", defaultxdg, 0);
 	free (defaultxdg);
+#endif
 
 	assert (sizeof (settings->keys) / sizeof (*settings->keys) ==
 			sizeof (dispatchActions) / sizeof (*dispatchActions));
@@ -518,7 +528,7 @@ void BarSettingsSaveCredentials (const BarSettings_t *settings) {
 		return;
 	}
 
-	char * const path = BarGetXdgConfigDir (PACKAGE "/config");
+	char * const path = BarGetXdgConfigDir (PACKAGE "/account.cfg");
 	assert (path != NULL);
 
 	/* keep any existing non-credential lines (custom keybindings, format
