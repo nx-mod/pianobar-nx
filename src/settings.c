@@ -233,6 +233,16 @@ void BarSettingsRead (BarSettings_t *settings) {
 
 		char * const path = BarGetXdgConfigDir (configfiles[j]);
 		assert (path != NULL);
+#ifdef __SWITCH__
+		{
+			FILE *dbg = fopen ("sdmc:/switch/pianobar-nx/debug.log", "a");
+			if (dbg != NULL) {
+				fprintf (dbg, "config: trying \"%s\" -> %s\n", path,
+						access (path, F_OK) == 0 ? "exists" : "MISSING");
+				fclose (dbg);
+			}
+		}
+#endif
 		if ((configfd = fopen (path, "r")) == NULL) {
 			free (path);
 			continue;

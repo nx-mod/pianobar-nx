@@ -1,7 +1,11 @@
 #pragma once
 
 /* package name */
+#ifdef __SWITCH__
+#define PACKAGE "pianobar-nx"
+#else
 #define PACKAGE "pianobar"
+#endif
 
 #define VERSION "2024.12.21-dev"
 
