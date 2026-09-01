@@ -95,7 +95,7 @@ export NROFLAGS	:=	--nacp=$(TOPDIR)/$(TARGET).nacp
 
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
 
-.PHONY: $(BUILD) clean all
+.PHONY: $(BUILD) clean all dist
 
 #---------------------------------------------------------------------------------
 all: $(BUILD)
@@ -103,6 +103,20 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
+
+#---------------------------------------------------------------------------------
+# Stages the SD card layout, per PACKAGING.md: zip top level mirrors the SD
+# card root, not the source tree. config/pianobar-nx/ is staged empty (with
+# a placeholder, since zip can't store an empty dir) so a fresh install has
+# somewhere for BarSettingsSaveCredentials to fopen() into -- it can't
+# create the parent directory itself.
+#---------------------------------------------------------------------------------
+dist: all
+	@rm -rf out pianobar-nx.zip
+	@mkdir -p out/switch/pianobar-nx out/config/pianobar-nx
+	@cp $(TARGET).nro out/switch/pianobar-nx/
+	@touch out/config/pianobar-nx/.keep
+	@cd out; zip -r ../pianobar-nx.zip ./*; cd ../
 
 #---------------------------------------------------------------------------------
 clean:

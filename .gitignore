@@ -13,3 +13,5 @@ build/
 *.elf
 *.nro
 *.nacp
+out/
+*.zip
